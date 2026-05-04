@@ -1,0 +1,277 @@
+# RL Electricity Pricing Project - Detailed Documentation
+
+## Overview
+This document provides a comprehensive guide to the RL Electricity Pricing project. It explains the Markov Decision Process (MDP) framework, the environment implementation, baseline agents, and reinforcement learning algorithms (DQN and PPO). The goal is to enable reproduction and deep understanding of the code.
+
+## Markov Decision Process (MDP) Fundamentals
+An MDP is a mathematical framework for decision-making in stochastic environments. It consists of:
+- **States (S)**: Representations of the environment at a given time
+- **Actions (A)**: Choices the agent can make
+- **Transition Function (P)**: Probability of moving from state s to s' via action a
+- **Reward Function (R)**: Immediate reward for taking action a in state s
+- **Discount Factor (γ)**: How much future rewards are valued (0 < γ ≤ 1)
+
+The agent learns a policy π(a|s) that maximizes expected cumulative discounted reward.
+
+### Example in Electricity Pricing
+- **State**: [current_demand_norm, prev_demand_norm, time_norm, prev_price_norm]
+- **Actions**: 5 price levels [0.5, 0.875, 1.25, 1.625, 2.0]
+- **Transition**: Deterministic time advance + stochastic demand response
+- **Reward**: revenue - penalty (quadratic for overloads)
+- **Policy**: Mapping from state to optimal price action
+
+## Environment: ElectricityPricingEnv
+Located in `envs/electricity_env.py`, this Gymnasium environment simulates 24-hour electricity pricing.
+
+### Key Parameters
+- `alpha=0.3`: Price elasticity (demand decreases as price increases)
+- `sigma=0.03`: Consumer noise standard deviation
+- `lambda_=2.0`: Overload penalty weight
+- `D_max=0.95`: Grid capacity threshold
+- `p_min=0.5, p_max=2.0`: Price range
+- `n_price_levels=5`: Discrete actions
+
+### State Representation
+```python
+def _get_obs(self) -> np.ndarray:
+    d_norm = np.clip(self._d_curr / 1.5, 0.0, 1.0)
+    d_prev_norm = np.clip(self._d_prev / 1.5, 0.0, 1.0)
+    t_norm = self._t / 23.0
+    p_norm = (self._p_prev - self.p_min) / (self.p_max - self.p_min)
+    return np.array([d_norm, d_prev_norm, t_norm, p_norm], dtype=np.float32)
+```
+
+### Demand Model
+Base demand follows realistic 24h pattern with peaks. Actual demand:
+```
+d_t = base_demand[t] * (1 - alpha * (p_t - p_ref)) + noise
+```
+Where noise ~ N(0, sigma), clipped to [0, 1.5].
+
+### Reward Function
+```python
+revenue = p_t * d_t
+overload = max(0.0, d_t - D_max)
+penalty = lambda_ * (overload ** 2)
+reward = revenue - penalty
+```
+
+### Termination
+- Natural: After 24 hours
+- Optional: On overload (if terminal_on_overload=True)
+
+## Baseline Agents
+Located in `agents/baselines.py`.
+
+### Fixed Price Agent
+Always sets price to reference level (1.0).
+```python
+class FixedPriceAgent:
+    def __init__(self, env: ElectricityPricingEnv):
+        prices = env.price_levels()
+        self.action = int(np.argmin(np.abs(prices - env.p_ref)))
+
+    def act(self, obs: np.ndarray) -> int:
+        return self.action
+```
+**Why it works poorly**: Ignores demand fluctuations, leading to overloads during peaks.
+
+### Heuristic Agent
+Rule-based pricing based on normalized demand thresholds.
+```python
+class HeuristicAgent:
+    def __init__(self, env, high_thresh=0.65, low_thresh=0.40):
+        self.high_action = env.n_price_levels - 1  # Highest price
+        self.low_action = 0  # Lowest price
+        self.mid_action = env.n_price_levels // 2  # Middle price
+        self.high_thresh = high_thresh
+        self.low_thresh = low_thresh
+
+    def act(self, obs: np.ndarray) -> int:
+        d_norm = float(obs[0])
+        if d_norm > self.high_thresh:
+            return self.high_action  # High demand → high price
+        elif d_norm < self.low_thresh:
+            return self.low_action   # Low demand → low price
+        else:
+            return self.mid_action   # Medium demand → medium price
+```
+**How it works**: Uses demand signal (obs[0]) to adjust prices. Reduces but doesn't eliminate overloads.
+
+## DQN Agent
+Located in `agents/dqn.py`. Implements Deep Q-Network (Mnih et al., 2015).
+
+### Algorithm Overview
+DQN learns Q-values Q(s,a) approximating expected future rewards. Uses:
+- **Experience Replay**: Stores transitions (s,a,r,s') in buffer, samples randomly
+- **Target Network**: Separate network for stable Q-targets, updated periodically
+- **ε-greedy Exploration**: Balances exploration (random) vs exploitation (greedy)
+
+### Key Components
+
+#### Q-Network
+Simple MLP: state → hidden (64) → hidden (64) → Q-values (5 actions)
+```python
+class QNetwork(nn.Module):
+    def __init__(self, obs_dim, n_actions, hidden_dim=64):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim, hidden_dim), nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
+            nn.Linear(hidden_dim, n_actions)
+        )
+```
+
+#### Replay Buffer
+Circular buffer storing up to 10,000 transitions.
+```python
+class ReplayBuffer:
+    def __init__(self, capacity=10_000):
+        self.buffer = deque(maxlen=capacity)
+
+    def push(self, obs, action, reward, next_obs, done):
+        self.buffer.append((obs, action, reward, next_obs, done))
+
+    def sample(self, batch_size):
+        # Returns numpy arrays for batch processing
+```
+
+#### Training Update
+Bellman equation: Q(s,a) = r + γ * max_a' Q(s',a')
+```python
+def _update(self):
+    obs, actions, rewards, next_obs, dones = self.buffer.sample(batch_size)
+    # Convert to tensors...
+    q_values = self.q_net(obs_t).gather(1, actions_t.unsqueeze(1)).squeeze(1)
+    with torch.no_grad():
+        next_q = self.target_net(next_obs_t).max(dim=1).values
+        target = rewards_t + self.gamma * next_q * (1.0 - dones_t)
+    loss = nn.functional.mse_loss(q_values, target)
+    # Backprop...
+```
+
+#### Exploration Schedule
+ε decays linearly from 1.0 to 0.05 over 5,000 steps.
+
+### Training Loop
+For each episode:
+1. Reset environment
+2. While not done: act (ε-greedy), step, store transition, update
+3. Every 200 steps: update target network
+
+### Why DQN Works Well Here
+- Discrete actions fit Q-learning perfectly
+- Experience replay reduces correlation between samples
+- Target network prevents moving target problem
+- Achieves stable, low-variance demand management
+
+## PPO Agent
+Located in `agents/ppo.py`. Implements Proximal Policy Optimization (Schulman et al., 2017).
+
+### Algorithm Overview
+PPO is a policy gradient method that learns π(a|s) directly. Key innovations:
+- **Actor-Critic**: Actor (policy) + Critic (value function)
+- **GAE (Generalized Advantage Estimation)**: Reduces variance in advantage estimates
+- **Clipped Surrogate Objective**: Prevents large policy updates
+- **Multiple Epochs**: Reuses rollout data for efficiency
+
+### Key Components
+
+#### Actor-Critic Network
+Shared backbone: state → hidden (64) → actor_logits (5) + critic_value (1)
+```python
+class ActorCritic(nn.Module):
+    def __init__(self, obs_dim, n_actions, hidden_dim=64):
+        # Backbone with Tanh activations
+        self.backbone = nn.Sequential(
+            nn.Linear(obs_dim, hidden_dim), nn.Tanh(),
+            nn.Linear(hidden_dim, hidden_dim), nn.Tanh()
+        )
+        self.actor_head = nn.Linear(hidden_dim, n_actions)
+        self.critic_head = nn.Linear(hidden_dim, 1)
+```
+
+#### Rollout Buffer
+Stores one trajectory of experiences (cleared after update).
+```python
+class RolloutBuffer:
+    def __init__(self):
+        self.obs, self.actions, self.rewards, self.values, self.log_probs, self.dones = [], [], [], [], [], []
+```
+
+#### GAE Computation
+Advantages = rewards + γ * next_values - values, smoothed with λ.
+```python
+def _compute_gae(self, last_value):
+    advantages = np.zeros(T)
+    gae = 0.0
+    for t in reversed(range(T)):
+        next_value = last_value if t == T-1 else values[t+1]
+        delta = rewards[t] + gamma * next_value * (1 - dones[t]) - values[t]
+        gae = delta + gamma * gae_lambda * (1 - dones[t]) * gae
+        advantages[t] = gae
+    return advantages, advantages + values
+```
+
+#### PPO Update
+Clipped objective: L_clip = min(r * A, clip(r, 1-ε, 1+ε) * A)
+```python
+def _update(self, last_value):
+    advantages, value_targets = self._compute_gae(last_value)
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    # For each epoch:
+    for _ in range(n_epochs):
+        # Minibatch sampling...
+        ratio = torch.exp(new_log_probs - old_log_probs)
+        surr1 = ratio * advantages
+        surr2 = torch.clamp(ratio, 1-clip_epsilon, 1+clip_epsilon) * advantages
+        policy_loss = -torch.min(surr1, surr2).mean()
+        value_loss = nn.functional.mse_loss(new_values, value_targets)
+        entropy_loss = -entropy.mean()  # Bonus for exploration
+        total_loss = policy_loss + vf_coef * value_loss + ent_coef * entropy_loss
+        # Backprop...
+```
+
+### Training Loop
+1. Collect rollout_steps transitions using current policy
+2. Compute GAE advantages
+3. Update policy n_epochs times with minibatches
+4. Repeat until n_episodes reached
+
+### Why PPO Works Well Here
+- Continuous policy learning adapts to demand patterns
+- GAE provides accurate advantage estimates
+- Clipping ensures stable updates
+- Entropy bonus prevents premature convergence
+- Slightly lower performance than DQN due to discrete action space
+
+## Running Experiments
+Located in `experiments/run_experiment.py`.
+
+### Configuration
+- ENV_KWARGS: Environment parameters
+- DQN_KWARGS: DQN hyperparameters (lr=1e-3, gamma=0.97, etc.)
+- PPO_KWARGS: PPO hyperparameters (lr=3e-4, gamma=0.97, etc.)
+- N_TRAIN_EPISODES = 600
+- N_EVAL_EPISODES = 100
+
+### Workflow
+1. Train DQN and PPO agents
+2. Evaluate all agents (Fixed, Heuristic, DQN, PPO)
+3. Save models, metrics, and plots
+4. Generate comparison visualizations
+
+### Key Results
+DQN outperforms PPO slightly in this setup:
+- DQN: 20.56 ± 0.33 reward, 0 overloads, 0.745 peak demand
+- PPO: 20.36 ± 0.27 reward, 0 overloads, 0.821 peak demand
+
+Both eliminate overloads and significantly improve over baselines.
+
+## Reproduction Guide
+1. Install dependencies: `pip install torch numpy gymnasium matplotlib`
+2. Run experiments: `python -m experiments.run_experiment`
+3. View results in `results/` directory
+4. Modify hyperparameters in `run_experiment.py` for experimentation
+
+This documentation covers the core concepts and implementation details needed to understand and reproduce the project.
