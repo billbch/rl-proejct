@@ -1,0 +1,39 @@
+============================================================
+EVALUATION RESULTS  (mean ± std over 100 episodes)
+============================================================
+
+  Fixed Price
+  ----------------------------------------
+  total_reward          :   0.4837  ±  0.7892
+  total_revenue         :  10.4965  ±  0.7945
+  total_penalty         :   0.0127  ±  0.0130
+  peak_demand           :   1.0169  ±  0.0435
+  n_overloads           :   1.0000  ±  0.0000
+  demand_variance       :   0.0477  ±  0.0037
+
+  Heuristic
+  ----------------------------------------
+  total_reward          :  10.2285  ±  6.4588
+  total_revenue         :  13.3290  ±  2.1194
+  total_penalty         :   0.0005  ±  0.0016
+  peak_demand           :   0.9348  ±  0.0305
+  n_overloads           :   0.3100  ±  0.4625
+  demand_variance       :   0.0327  ±  0.0034
+
+  DQN
+  ----------------------------------------
+  total_reward          :  20.5584  ±  0.3298
+  total_revenue         :  20.5584  ±  0.3298
+  total_penalty         :   0.0000  ±  0.0000
+  peak_demand           :   0.7445  ±  0.0516
+  n_overloads           :   0.0000  ±  0.0000
+  demand_variance       :   0.0235  ±  0.0026
+
+  PPO
+  ----------------------------------------
+  total_reward          :  20.3640  ±  0.2687
+  total_revenue         :  20.3640  ±  0.2687
+  total_penalty         :   0.0000  ±  0.0000
+  peak_demand           :   0.8211  ±  0.0283
+  n_overloads           :   0.0000  ±  0.0000
+  demand_variance       :   0.0323  ±  0.0023
