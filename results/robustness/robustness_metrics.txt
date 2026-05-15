@@ -1,0 +1,160 @@
+========================================================================
+ROBUSTNESS EXPERIMENT — SUMMARY TABLE
+(mean ± std over 100 episodes per profile, then aggregated)
+========================================================================
+
+  Agent: Fixed-Price
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 -1.3379    3.5964          Weekend       Industrial
+  Total Revenue                 7.9426    2.7985          Weekend       Industrial
+  Overload Events               0.9275    0.1143          Weekend       Industrial
+  Peak Demand                   0.9869    0.0208          Weekend       Industrial
+  Demand Variance               0.0530    0.0095          Weekend       Industrial
+
+  Reward across profiles: Residential=0.484  Industrial=-4.788  Summer_AC=-4.718  Weekend=3.671
+  Worst-case reward: -4.7884  |  Range: 8.4593  |  (smaller range = more robust)
+
+  Agent: Heuristic
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 11.8664    2.3470       Industrial        Summer_AC
+  Total Revenue                13.4666    0.9749       Industrial        Summer_AC
+  Overload Events               0.1600    0.1602       Industrial        Summer_AC
+  Peak Demand                   0.9058    0.0329       Industrial        Summer_AC
+  Demand Variance               0.0356    0.0064       Industrial        Summer_AC
+
+  Reward across profiles: Residential=10.229  Industrial=15.044  Summer_AC=9.088  Weekend=13.104
+  Worst-case reward: 9.0882  |  Range: 5.9563  |  (smaller range = more robust)
+
+  Agent: DQN-specialist-Residential
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 19.7189    0.5598        Summer_AC          Weekend
+  Total Revenue                19.7189    0.5598        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.7083    0.0151        Summer_AC          Weekend
+  Demand Variance               0.0221    0.0020        Summer_AC          Weekend
+
+  Reward across profiles: Residential=19.784  Industrial=19.761  Summer_AC=20.453  Weekend=18.877
+  Worst-case reward: 18.8770  |  Range: 1.5758  |  (smaller range = more robust)
+
+  Agent: PPO-specialist-Residential
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 20.3303    0.7076        Summer_AC          Weekend
+  Total Revenue                20.3303    0.7076        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.7596    0.0386        Summer_AC          Weekend
+  Demand Variance               0.0321    0.0013        Summer_AC          Weekend
+
+  Reward across profiles: Residential=20.364  Industrial=20.792  Summer_AC=20.995  Weekend=19.170
+  Worst-case reward: 19.1700  |  Range: 1.8252  |  (smaller range = more robust)
+
+  Agent: DQN-specialist-Industrial
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 19.2465    1.2015        Summer_AC          Weekend
+  Total Revenue                19.4715    0.8305        Summer_AC          Weekend
+  Overload Events               0.0225    0.0390        Summer_AC          Weekend
+  Peak Demand                   0.7751    0.0839        Summer_AC          Weekend
+  Demand Variance               0.0245    0.0006        Summer_AC          Weekend
+
+  Reward across profiles: Residential=19.435  Industrial=20.049  Summer_AC=20.268  Weekend=17.234
+  Worst-case reward: 17.2338  |  Range: 3.0340  |  (smaller range = more robust)
+
+  Agent: PPO-specialist-Industrial
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 19.5701    0.6522        Summer_AC          Weekend
+  Total Revenue                19.5701    0.6522        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.7981    0.0286        Summer_AC          Weekend
+  Demand Variance               0.0358    0.0074        Summer_AC          Weekend
+
+  Reward across profiles: Residential=19.624  Industrial=19.951  Summer_AC=20.206  Weekend=18.499
+  Worst-case reward: 18.4985  |  Range: 1.7078  |  (smaller range = more robust)
+
+  Agent: DQN-specialist-Summer_AC
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 19.4586    0.7192        Summer_AC          Weekend
+  Total Revenue                19.4586    0.7192        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.7647    0.0406        Summer_AC          Weekend
+  Demand Variance               0.0233    0.0045        Summer_AC          Weekend
+
+  Reward across profiles: Residential=19.540  Industrial=19.885  Summer_AC=20.141  Weekend=18.269
+  Worst-case reward: 18.2688  |  Range: 1.8718  |  (smaller range = more robust)
+
+  Agent: PPO-specialist-Summer_AC
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 20.7352    0.6793        Summer_AC          Weekend
+  Total Revenue                20.7352    0.6793        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.6916    0.0243        Summer_AC          Weekend
+  Demand Variance               0.0265    0.0052        Summer_AC          Weekend
+
+  Reward across profiles: Residential=20.805  Industrial=21.127  Summer_AC=21.393  Weekend=19.615
+  Worst-case reward: 19.6152  |  Range: 1.7780  |  (smaller range = more robust)
+
+  Agent: DQN-specialist-Weekend
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 19.5336    0.3455        Summer_AC          Weekend
+  Total Revenue                19.5336    0.3455        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.7213    0.0459        Summer_AC          Weekend
+  Demand Variance               0.0224    0.0033        Summer_AC          Weekend
+
+  Reward across profiles: Residential=19.826  Industrial=19.395  Summer_AC=19.881  Weekend=19.032
+  Worst-case reward: 19.0316  |  Range: 0.8499  |  (smaller range = more robust)
+
+  Agent: PPO-specialist-Weekend
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 20.7352    0.6793        Summer_AC          Weekend
+  Total Revenue                20.7352    0.6793        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.6916    0.0243        Summer_AC          Weekend
+  Demand Variance               0.0265    0.0052        Summer_AC          Weekend
+
+  Reward across profiles: Residential=20.805  Industrial=21.127  Summer_AC=21.393  Weekend=19.615
+  Worst-case reward: 19.6152  |  Range: 1.7780  |  (smaller range = more robust)
+
+  Agent: DQN-robust
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 20.3298    0.6632        Summer_AC          Weekend
+  Total Revenue                20.3298    0.6632        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.7013    0.0245        Summer_AC          Weekend
+  Demand Variance               0.0239    0.0053        Summer_AC          Weekend
+
+  Reward across profiles: Residential=20.387  Industrial=20.707  Summer_AC=20.984  Weekend=19.241
+  Worst-case reward: 19.2408  |  Range: 1.7430  |  (smaller range = more robust)
+
+  Agent: PPO-robust
+  ------------------------------------------------------------
+  Metric                          Mean       Std     Best profile    Worst profile
+  --------------------------------------------------------------------------------
+  Total Reward                 20.7352    0.6793        Summer_AC          Weekend
+  Total Revenue                20.7352    0.6793        Summer_AC          Weekend
+  Overload Events               0.0000    0.0000        Summer_AC          Weekend
+  Peak Demand                   0.6916    0.0243        Summer_AC          Weekend
+  Demand Variance               0.0265    0.0052        Summer_AC          Weekend
+
+  Reward across profiles: Residential=20.805  Industrial=21.127  Summer_AC=21.393  Weekend=19.615
+  Worst-case reward: 19.6152  |  Range: 1.7780  |  (smaller range = more robust)

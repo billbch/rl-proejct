@@ -1,12 +1,18 @@
 """
-ElectricityPricingEnv
-=====================
+envs/electricity_env.py
+=======================
 MDP for dynamic electricity pricing.
 
 State:  s_t = (d_t, d_{t-1}, t, p_{t-1})
 Action: discrete price level in {0,1,2,3,4} → mapped to [p_min, p_max]
 Reward: p_t * d_t  −  λ * max(0, d_t − D_max)²
         + terminal penalty if d_t > D_max (episode ends)
+
+Changes vs original
+-------------------
+* Accepts an optional `base_demand` parameter so any 24-h demand profile
+  can be injected (used by the robustness / multi-demand experiments).
+* Default behaviour is identical to the original code.
 """
 
 import numpy as np
@@ -15,10 +21,9 @@ from gymnasium import spaces
 
 
 # ---------------------------------------------------------------------------
-# Demand base profile (24h) — realistic shape with morning & evening peaks
-# Values in normalised kWh units (you can scale later)
+# Default demand base profile (24h) — residential shape
 # ---------------------------------------------------------------------------
-BASE_DEMAND = np.array([
+_DEFAULT_BASE_DEMAND = np.array([
     0.40, 0.35, 0.30, 0.28, 0.28, 0.32,   # 00–05  night valley
     0.50, 0.70, 0.85, 0.80, 0.75, 0.70,   # 06–11  morning ramp + peak
     0.65, 0.60, 0.58, 0.60, 0.65, 0.75,   # 12–17  midday plateau
@@ -30,14 +35,18 @@ class ElectricityPricingEnv(gym.Env):
     """
     Parameters
     ----------
-    alpha   : float  — price elasticity of demand
-    sigma   : float  — std of stochastic consumer noise
-    lambda_ : float  — penalty weight for exceeding D_max
-    D_max   : float  — grid capacity (normalised units)
-    p_min   : float  — minimum price level
-    p_max   : float  — maximum price level
-    n_price_levels : int — number of discrete price actions
-    seed    : int | None
+    alpha          : float       — price elasticity of demand
+    sigma          : float       — std of stochastic consumer noise
+    lambda_        : float       — penalty weight for exceeding D_max
+    D_max          : float       — grid capacity (normalised units)
+    p_min          : float       — minimum price level
+    p_max          : float       — maximum price level
+    p_ref          : float       — reference price for elasticity baseline
+    n_price_levels : int         — number of discrete price actions
+    base_demand    : np.ndarray | None
+                                 — 24-element demand profile; if None the
+                                   default residential profile is used
+    seed           : int | None
     """
 
     metadata = {"render_modes": ["human"]}
@@ -54,6 +63,7 @@ class ElectricityPricingEnv(gym.Env):
         n_price_levels: int = 5,
         terminal_on_overload: bool = True,
         terminal_penalty: float = -10.0,
+        base_demand: np.ndarray | None = None,
         seed: int | None = None,
     ):
         super().__init__()
@@ -70,15 +80,20 @@ class ElectricityPricingEnv(gym.Env):
         self.terminal_on_overload = terminal_on_overload
         self.terminal_penalty = terminal_penalty
 
+        # demand profile — validated and stored
+        if base_demand is not None:
+            bd = np.asarray(base_demand, dtype=np.float64)
+            if bd.shape != (24,):
+                raise ValueError(f"base_demand must have 24 elements, got {bd.shape}")
+            self.base_demand = bd
+        else:
+            self.base_demand = _DEFAULT_BASE_DEMAND.copy()
+
         # Discrete price grid  e.g. [0.5, 0.875, 1.25, 1.625, 2.0]
         self.price_grid = np.linspace(p_min, p_max, n_price_levels)
 
         # --- spaces ---
-        # Action: index into price_grid
         self.action_space = spaces.Discrete(n_price_levels)
-
-        # State: (d_t, d_{t-1}, t_norm, p_{t-1}_norm)
-        # All values normalised to [0, 1] for the neural net
         self.observation_space = spaces.Box(
             low=np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32),
             high=np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32),
@@ -102,8 +117,7 @@ class ElectricityPricingEnv(gym.Env):
         super().reset(seed=seed)
 
         self._t = 0
-        # start with base demand at t=0 plus small noise
-        self._d_curr = float(BASE_DEMAND[0]) + self.np_random.normal(0, self.sigma)
+        self._d_curr = float(self.base_demand[0]) + self.np_random.normal(0, self.sigma)
         self._d_curr = np.clip(self._d_curr, 0.0, 1.5)
         self._d_prev = self._d_curr
         self._p_prev = self.p_ref
@@ -115,11 +129,11 @@ class ElectricityPricingEnv(gym.Env):
 
         p_t = self.price_grid[action]
 
-        # --- consumer response (best-responding static agents) ---
-        d_base = BASE_DEMAND[self._t]
-        delta_p = p_t - self.p_ref                          # deviation from reference
-        d_t = d_base * (1.0 - self.alpha * delta_p)         # elasticity
-        d_t += self.np_random.normal(0.0, self.sigma)        # stochastic noise
+        # --- consumer response ---
+        d_base = self.base_demand[self._t]
+        delta_p = p_t - self.p_ref
+        d_t = d_base * (1.0 - self.alpha * delta_p)
+        d_t += self.np_random.normal(0.0, self.sigma)
         d_t = float(np.clip(d_t, 0.0, 1.5))
 
         # --- reward ---
@@ -140,15 +154,14 @@ class ElectricityPricingEnv(gym.Env):
         self._p_prev = p_t
         self._t += 1
 
-        # natural end of episode (24 hours)
         if self._t >= 24:
             terminated = True
 
         truncated = False
         info = {
-            "hour": self._t - 1,
-            "price": p_t,
-            "demand": d_t,
+            "hour":    self._t - 1,
+            "price":   p_t,
+            "demand":  d_t,
             "revenue": revenue,
             "penalty": penalty,
             "overload": overload > 0,
@@ -167,7 +180,6 @@ class ElectricityPricingEnv(gym.Env):
     # ------------------------------------------------------------------
 
     def _get_obs(self) -> np.ndarray:
-        """Return normalised state vector (d_t, d_{t-1}, t_norm, p_{t-1}_norm)."""
         d_norm      = np.clip(self._d_curr / 1.5, 0.0, 1.0)
         d_prev_norm = np.clip(self._d_prev / 1.5, 0.0, 1.0)
         t_norm      = self._t / 23.0
@@ -179,3 +191,10 @@ class ElectricityPricingEnv(gym.Env):
 
     def price_levels(self) -> np.ndarray:
         return self.price_grid.copy()
+
+    def set_base_demand(self, profile: np.ndarray) -> None:
+        """Hot-swap the demand profile (used by the multi-demand wrapper)."""
+        bd = np.asarray(profile, dtype=np.float64)
+        if bd.shape != (24,):
+            raise ValueError(f"base_demand must have 24 elements, got {bd.shape}")
+        self.base_demand = bd
